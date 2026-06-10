@@ -1,51 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Exam Result</title>
     {% load static %}
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
+
 <body>
     <div class="container mt-5">
         <h1>Exam Result for {{ course.name }}</h1>
-        
+
         {% if result.score >= 70 %}
-            <div class="alert alert-success">
-                <strong>Congratulations!</strong> You have passed the exam.
-            </div>
+        <div class="alert alert-success">
+            <strong>Congratulations!</strong> You have passed the exam.
+        </div>
         {% else %}
-            <div class="alert alert-danger">
-                <strong>Sorry!</strong> You have not passed the exam.
-            </div>
+        <div class="alert alert-danger">
+            <strong>Sorry!</strong> You have not passed the exam.
+        </div>
         {% endif %}
-        
+
         <h2>Your Score: {{ result.score|floatformat:2 }}%</h2>
         <p>Correct Answers: {{ result.correct_answers }} out of {{ result.total_questions }}</p>
-        
+
         <h3>Your Answers:</h3>
         {% for submission in submissions %}
-            {% for choice in submission.choices.all %}
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ choice.question.question_text }}</h5>
-                        <p class="card-text">Your answer: {{ choice.choice_text }}</p>
-                        {% if choice.is_correct %}
-                            <p class="text-success">Correct</p>
-                        {% else %}
-                            <p class="text-danger">Incorrect</p>
-                            {% for correct_choice in choice.question.choice_set.all %}
-                                {% if correct_choice.is_correct %}
-                                    <p class="text-info">Correct answer: {{ correct_choice.choice_text }}</p>
-                                {% endif %}
-                            {% endfor %}
-                        {% endif %}
-                    </div>
-                </div>
-            {% endfor %}
+        {% for choice in submission.choices.all %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ choice.question.question_text }}</h5>
+                <p class="card-text">Your answer: {{ choice.choice_text }}</p>
+                {% if choice.is_correct %}
+                <p class="text-success">Correct</p>
+                {% else %}
+                <p class="text-danger">Incorrect</p>
+                {% for correct_choice in choice.question.choice_set.all %}
+                {% if correct_choice.is_correct %}
+                <p class="text-info">Correct answer: {{ correct_choice.choice_text }}</p>
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
         {% endfor %}
-        
+        {% endfor %}
+
         <a href="{% url 'course_details' course.id %}" class="btn btn-primary">Back to Course</a>
     </div>
 </body>
+
 </html>

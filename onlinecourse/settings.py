@@ -25,13 +25,14 @@ SECRET_KEY = 'django-insecure-pq7j=y$0uqof@w=(%c9hzm(55#j(q8a&i%o10xv2gakqv(at1f
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*', '127.0.0.1', 'localhost']
 
 
 # Application definition
 
 INSTALLED_APPS = [
     'onlinecourse_app',
+    'django_extensions',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -122,3 +123,6 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = '/onlinecourse/course/1/'
