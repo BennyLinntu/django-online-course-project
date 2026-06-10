@@ -21,9 +21,11 @@ from onlinecourse_app import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('onlinecourse/course/<int:course_id>/', views.course_details, name='course_details'),
+    path('onlinecourse/course/<int:course_id>/',
+         views.course_details, name='course_details'),
     path('onlinecourse/submit/<int:course_id>/', views.submit, name='submit'),
-    path('onlinecourse/result/<int:course_id>/', views.show_exam_result, name='show_exam_result'),
+    path('onlinecourse/result/<int:course_id>/',
+         views.show_exam_result, name='show_exam_result'),
     path('onlinecourse/', include('onlinecourse_app.urls')),
     path('login/', auth_views.LoginView.as_view(template_name='onlinecourse_app/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
