@@ -1,3 +1,5 @@
+from onlinecourse_app.models import Course, Lesson, Instructor, Learner, Question, Choice, Enrollment
+from django.contrib.auth.models import User
 import os
 import django
 from datetime import datetime
@@ -5,8 +7,6 @@ from datetime import datetime
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'onlinecourse.settings')
 django.setup()
 
-from django.contrib.auth.models import User
-from onlinecourse_app.models import Course, Lesson, Instructor, Learner, Question, Choice, Enrollment
 
 # Create a test course
 course = Course.objects.create(

@@ -18,7 +18,8 @@ class Command(BaseCommand):
         )
 
         if created:
-            self.stdout.write(self.style.SUCCESS(f'Created course: {course.name}'))
+            self.stdout.write(self.style.SUCCESS(
+                f'Created course: {course.name}'))
 
         # Create lessons
         lesson1, created = Lesson.objects.get_or_create(
@@ -105,11 +106,12 @@ class Command(BaseCommand):
                 'email': 'test@example.com'
             }
         )
-        
+
         if created:
             user.set_password('testpass123')
             user.save()
-            self.stdout.write(self.style.SUCCESS(f'Created user: {user.username}'))
+            self.stdout.write(self.style.SUCCESS(
+                f'Created user: {user.username}'))
 
         # Create an enrollment
         enrollment, created = Enrollment.objects.get_or_create(
@@ -118,7 +120,8 @@ class Command(BaseCommand):
             defaults={'mode': 'audit'}
         )
 
-        self.stdout.write(self.style.SUCCESS('Test data populated successfully!'))
+        self.stdout.write(self.style.SUCCESS(
+            'Test data populated successfully!'))
         self.stdout.write(f'Course: {course.name}')
         self.stdout.write(f'Lessons: {course.lesson_set.count()}')
         self.stdout.write(f'Questions: {course.question_set.count()}')
