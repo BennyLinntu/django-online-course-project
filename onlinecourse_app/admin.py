@@ -1,5 +1,13 @@
 from django.contrib import admin
-from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
+from django.contrib.admin import (
+    ModelAdmin,
+    StackedInline,
+    TabularInline,
+    AdminSite,
+    site,
+    register,
+    SimpleListFilter,
+)
 from .models import Course, Lesson, Instructor, Learner, Question, Choice, Enrollment
 
 
