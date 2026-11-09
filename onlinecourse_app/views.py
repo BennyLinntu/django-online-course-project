@@ -1,117 +1,200 @@
-from django.shortcuts import render, get_object_or_404
-from django.http import HttpResponseRedirect
-from django.urls import reverse
-from .models import Course, Lesson, Enrollment, Question, Choice, Submission
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import Http404
+from django.db.models import Count, Prefetch, Q
+from django.http import Http404, HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views.decorators.http import require_POST
+
+from .models import Choice, Course, Enrollment, Lesson, Question, ExamAttempt
+
+
+def course_list(request):
+    """Public catalogue of available courses."""
+    query = request.GET.get("q", "").strip()
+    courses = Course.objects.annotate(
+        lesson_total=Count("lessons", distinct=True),
+        learner_total=Count("enrollments", distinct=True),
+    ).prefetch_related("instructors__user")
+
+    if query:
+        courses = courses.filter(
+            Q(name__icontains=query) | Q(description__icontains=query)
+        )
+
+    return render(
+        request,
+        "onlinecourse_app/course_list.html",
+        {
+            "courses": courses,
+            "search_query": query,
+            "total_courses": Course.objects.count(),
+            "total_lessons": Lesson.objects.count(),
+            "total_learners": Enrollment.objects.values("user").distinct().count(),
+        },
+    )
 
 
 @login_required
 def course_details(request, course_id):
-    course = get_object_or_404(Course, pk=course_id)
-    return render(request, 'onlinecourse_app/course_details_bootstrap.html', {'course': course})
+    course = get_object_or_404(
+        Course.objects.prefetch_related(
+            Prefetch("lessons", queryset=Lesson.objects.order_by("order", "id")),
+            Prefetch(
+                "questions",
+                queryset=Question.objects.select_related("lesson").prefetch_related(
+                    "choices"
+                ),
+            ),
+        ),
+        pk=course_id,
+    )
+    enrollment, created = Enrollment.objects.get_or_create(
+        user=request.user, course=course, defaults={"mode": Enrollment.AUDIT}
+    )
+    if created:
+        course.total_enrollment = course.enrollments.count()
+        course.save(update_fields=["total_enrollment"])
+
+    latest_attempt = (
+        ExamAttempt.objects.filter(enrollment=enrollment)
+        .prefetch_related("choices")
+        .first()
+    )
+
+    return render(
+        request,
+        "onlinecourse_app/course_details.html",
+        {
+            "course": course,
+            "enrollment": enrollment,
+            "latest_attempt": latest_attempt,
+            "question_count": course.questions.count(),
+            "total_points": sum(
+                question.grade for question in course.questions.all()
+            ),
+        },
+    )
 
 
 @login_required
+@require_POST
 def submit(request, course_id):
-    """Handle exam submission"""
-    if request.method == 'POST':
-        try:
-            enrollment = Enrollment.objects.get(
-                user=request.user, course_id=course_id)
-        except Enrollment.DoesNotExist:
-            return HttpResponseRedirect(f'/onlinecourse/course/{course_id}/')
+    """Grade one attempt and persist every selected answer."""
+    course = get_object_or_404(Course, pk=course_id)
+    enrollment = Enrollment.objects.filter(
+        user=request.user, course=course
+    ).first()
+    if enrollment is None:
+        messages.error(request, "You need to open the course before taking the exam.")
+        return redirect("course_details", course_id=course.id)
 
-        # Clear previous submissions
-        Submission.objects.filter(enrollment=enrollment).delete()
+    questions = list(
+        Question.objects.filter(course=course)
+        .select_related("lesson")
+        .prefetch_related("choices")
+        .order_by("lesson__order", "id")
+    )
+    if not questions:
+        messages.info(request, "This course does not have an exam yet.")
+        return redirect("course_details", course_id=course.id)
 
-        total_questions = 0
-        correct_answers = 0
-        choices_selected = []
+    selected_choices = []
+    correct_count = 0
+    total_points = 0
+    earned_points = 0
+    unanswered = 0
 
-        for key, value in request.POST.items():
-            if key.startswith('question_'):
-                try:
-                    question_id = int(key.split('_')[1])
-                    choice_id = int(value)
+    for question in questions:
+        total_points += question.grade
+        raw = request.POST.get(f"question_{question.id}")
+        choice = None
+        if raw:
+            choice = next(
+                (item for item in question.choices.all() if str(item.id) == raw),
+                None,
+            )
+        if choice is None:
+            unanswered += 1
+            continue
 
-                    question = Question.objects.get(pk=question_id)
-                    choice = Choice.objects.get(pk=choice_id)
+        selected_choices.append(choice)
+        if choice.is_correct:
+            correct_count += 1
+            earned_points += question.grade
 
-                    submission = Submission(enrollment=enrollment)
-                    submission.save()
-                    submission.choices.add(choice)
+    attempt = ExamAttempt.objects.create(
+        enrollment=enrollment,
+        score=round((earned_points / total_points) * 100, 2) if total_points else 0,
+        correct_count=correct_count,
+        total_questions=len(questions),
+    )
+    attempt.choices.set(selected_choices)
 
-                    choices_selected.append({
-                        'question_id': question_id,
-                        'choice_id': choice_id,
-                        'choice_text': choice.choice_text,
-                        'is_correct': choice.is_correct
-                    })
+    if unanswered:
+        messages.warning(
+            request,
+            f"{unanswered} question{'s' if unanswered != 1 else ''} left unanswered.",
+        )
 
-                    total_questions += 1
-                    if choice.is_correct:
-                        correct_answers += 1
-                except (Question.DoesNotExist, Choice.DoesNotExist, ValueError):
-                    continue
-
-        score = (correct_answers / total_questions) * \
-            100 if total_questions > 0 else 0
-
-        # Store comprehensive result in session
-        request.session['exam_result'] = {
-            'score': score,
-            'total_questions': total_questions,
-            'correct_answers': correct_answers,
-            'choices': choices_selected
-        }
-
-        return HttpResponseRedirect(reverse('show_exam_result', args=[course_id]))
-    else:
-        # Redirect GET requests to course details
-        return HttpResponseRedirect(reverse('course_details', args=[course_id]))
+    return HttpResponseRedirect(reverse("show_exam_result", args=[course.id]))
 
 
 @login_required
 def show_exam_result(request, course_id):
-    """Display exam results"""
-    result = request.session.get('exam_result')
-    if not result:
-        raise Http404("Exam result not found.")
-
     course = get_object_or_404(Course, pk=course_id)
+    enrollment = Enrollment.objects.filter(
+        user=request.user, course=course
+    ).first()
+    if enrollment is None:
+        raise Http404("You are not enrolled in this course.")
 
-    # Get user's submissions for the exam
-    try:
-        enrollment = Enrollment.objects.get(
-            user=request.user, course_id=course_id)
-        submissions = Submission.objects.filter(enrollment=enrollment)
-    except Enrollment.DoesNotExist:
-        raise Http404("No enrollment found for this course.")
+    attempt = (
+        ExamAttempt.objects.filter(enrollment=enrollment)
+        .prefetch_related("choices")
+        .first()
+    )
+    if attempt is None:
+        messages.info(request, "Take the exam to see your result.")
+        return redirect("course_details", course_id=course.id)
 
-    # Prepare detailed result information
-    questions = Question.objects.filter(course_id=course_id)
+    questions = list(
+        Question.objects.filter(course=course)
+        .select_related("lesson")
+        .prefetch_related("choices")
+        .order_by("lesson__order", "id")
+    )
+    selected_by_question = {
+        choice.question_id: choice for choice in attempt.choices.all()
+    }
     result_details = []
 
     for question in questions:
-        question_result = {
-            'question': question,
-            'user_choice': None,
-            'is_correct': False
-        }
+        selected = selected_by_question.get(question.id)
+        correct_choice = next(
+            (choice for choice in question.choices.all() if choice.is_correct),
+            None,
+        )
+        result_details.append(
+            {
+                "question": question,
+                "selected": selected,
+                "correct_choice": correct_choice,
+                "is_correct": bool(selected and selected.is_correct),
+                "points": question.grade if selected and selected.is_correct else 0,
+            }
+        )
 
-        # Find user's choice for this question
-        for choice_info in result.get('choices', []):
-            if choice_info['question_id'] == question.id:
-                question_result['user_choice'] = choice_info['choice_text']
-                question_result['is_correct'] = choice_info['is_correct']
-                break
-
-        result_details.append(question_result)
-
-    return render(request, 'onlinecourse_app/exam_result.html', {
-        'result': result,
-        'course': course,
-        'submissions': submissions,
-        'result_details': result_details
-    })
+    return render(
+        request,
+        "onlinecourse_app/exam_result.html",
+        {
+            "course": course,
+            "enrollment": enrollment,
+            "attempt": attempt,
+            "result_details": result_details,
+            "passed": attempt.score >= 70,
+            "earned_points": sum(item["points"] for item in result_details),
+            "total_points": sum(question.grade for question in questions),
+        },
+    )

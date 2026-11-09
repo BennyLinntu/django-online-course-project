@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ course.name }} · OnlineCourse{% endblock %}
+
+{% block content %}
+<main class="shell">
+    <a class="breadcrumb" href="{% url 'course_list' %}">← All courses</a>
+
+    <section class="detail-hero">
+        <p class="detail-kicker">Course overview</p>
+        <h1>{{ course.name }}</h1>
+        <p>{{ course.description }}</p>
+        <div class="detail-meta">
+            <span class="pill">{{ course.lessons.count }} lesson{{ course.lessons.count|pluralize }}</span>
+            <span class="pill">{{ question_count }} exam question{{ question_count|pluralize }}</span>
+            <span class="pill">{{ total_points }} total point{{ total_points|pluralize }}</span>
+            <span class="pill">Enrolled {{ enrollment.date_enrolled|date:"M j, Y" }}</span>
+            {% for instructor in course.instructors.all %}
+            <span class="pill">{{ instructor }}</span>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="detail-layout">
+        <div>
+            <section class="panel">
+                <div class="panel-head">
+                    <h2>Lessons</h2>
+                    <span>{{ course.lessons.count }} modules</span>
+                </div>
+                <ol class="lesson-list">
+                    {% for lesson in course.lessons.all %}
+                    <li class="lesson-item">
+                        <span class="lesson-number">{{ lesson.order|stringformat:"02d" }}</span>
+                        <div>
+                            <h3>{{ lesson.title }}</h3>
+                            <p>{{ lesson.content }}</p>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="lesson-item">
+                        <span class="lesson-number">—</span>
+                        <div><h3>No lessons yet</h3><p>The instructor is still preparing this course.</p></div>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </section>
+
+            <section class="panel" id="exam">
+                <div class="panel-head">
+                    <h2>Final exam</h2>
+                    <span>Auto-graded</span>
+                </div>
+                {% if course.questions.all %}
+                <p class="exam-intro">
+                    Choose one answer per question. Unanswered questions score zero, and your
+                    latest attempt is shown on this page.
+                </p>
+                <form method="post" action="{% url 'submit' course.id %}">
+                    {% csrf_token %}
+                    {% for question in course.questions.all %}
+                    <article class="exam-question">
+                        <h3>
+                            <span class="q-number">{{ forloop.counter }}</span>
+                            <span>{{ question.question_text }}</span>
+                            <span class="q-points">{{ question.grade }} pt{{ question.grade|pluralize }}</span>
+                        </h3>
+                        <ul class="choice-list">
+                            {% for choice in question.choices.all %}
+                            <li>
+                                <label class="choice">
+                                    <input type="radio" name="question_{{ question.id }}"
+                                        value="{{ choice.id }}">
+                                    <span>{{ choice.choice_text }}</span>
+                                </label>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </article>
+                    {% endfor %}
+                    <div class="submit-exam">
+                        <p>{{ question_count }} question{{ question_count|pluralize }} · {{ total_points }} points · pass mark 70%</p>
+                        <button class="btn btn-accent" type="submit">Submit exam →</button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="empty-card">
+                    <h3>No exam yet</h3>
+                    <p>This course currently has lessons only.</p>
+                </div>
+                {% endif %}
+            </section>
+        </div>
+
+        <aside>
+            <div class="side-card">
+                <h2>Exam at a glance</h2>
+                <p>Everything you need before you start.</p>
+                <ul class="side-list">
+                    <li><span>Questions</span><strong>{{ question_count }}</strong></li>
+                    <li><span>Total points</span><strong>{{ total_points }}</strong></li>
+                    <li><span>Pass mark</span><strong>70%</strong></li>
+                    <li><span>Attempts</span><strong>Unlimited</strong></li>
+                </ul>
+
+                {% if latest_attempt %}
+                <div class="last-score">
+                    <div>
+                        <strong>{{ latest_attempt.score|floatformat:0 }}%</strong>
+                        <span>Last attempt · {{ latest_attempt.submitted_at|date:"M j" }}</span>
+                    </div>
+                </div>
+                <a class="btn btn-ghost" href="{% url 'show_exam_result' course.id %}">View last result</a>
+                {% else %}
+                <div class="side-note">You have not taken this exam yet. Submit your first attempt below.</div>
+                <a class="btn btn-ghost" href="#exam" style="margin-top:12px;">Go to exam</a>
+                {% endif %}
+            </div>
+        </aside>
+    </div>
+</main>
+{% endblock %}

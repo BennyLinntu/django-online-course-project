@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Courses · OnlineCourse{% endblock %}
+
+{% block content %}
+<main class="shell">
+    <section class="hero">
+        <div>
+            <p class="eyebrow">A small campus on the internet</p>
+            <h1>Learn something<br><em>worth finishing.</em></h1>
+            <p class="hero-lede">
+                Short lessons, clear explanations and auto-graded exams. Pick a course,
+                work through it at your pace, and see exactly what you got right.
+            </p>
+
+            <form class="search-form" method="get" action="{% url 'course_list' %}">
+                <input type="search" name="q" value="{{ search_query }}"
+                    placeholder="Search courses…" aria-label="Search courses">
+                <button type="submit">Search</button>
+            </form>
+
+            <div class="hero-stats">
+                <div><strong>{{ total_courses }}</strong><span>Courses</span></div>
+                <div><strong>{{ total_lessons }}</strong><span>Lessons</span></div>
+                <div><strong>{{ total_learners }}</strong><span>Learners</span></div>
+            </div>
+        </div>
+
+        <div class="hero-art" aria-hidden="true">
+            <div class="art-card art-badge">EXAM READY</div>
+            <div class="art-card art-card-main">
+                <span class="art-label">Lesson 03 · Control flow</span>
+                <h3>Variables &amp; decisions</h3>
+                <div class="art-line"></div>
+                <div class="art-line short"></div>
+                <div class="art-progress"><span>Course progress</span><span>72%</span></div>
+                <div class="art-bar"></div>
+            </div>
+            <div class="art-card art-card-score">
+                <div class="score-ring">92</div>
+                <div><strong>Exam passed</strong><span>14 of 15 points</span></div>
+            </div>
+        </div>
+    </section>
+
+    <div class="section-head">
+        <div>
+            <h2>{% if search_query %}Results for “{{ search_query }}”{% else %}Course catalogue{% endif %}</h2>
+            <p>{{ courses|length }} course{{ courses|length|pluralize }} available · new lessons added regularly</p>
+        </div>
+        {% if search_query %}<a class="breadcrumb" href="{% url 'course_list' %}">← All courses</a>{% endif %}
+    </div>
+
+    <section class="course-grid" aria-label="Courses">
+        {% for course in courses %}
+        <a class="course-card" href="{% url 'course_details' course.id %}">
+            <div class="course-index">
+                <span>Course {{ forloop.counter|stringformat:"02d" }}</span>
+                <span class="course-number">{{ forloop.counter|stringformat:"02d" }}</span>
+            </div>
+            <h3>{{ course.name }}</h3>
+            <p>{{ course.description }}</p>
+            <div class="course-meta">
+                <span class="pill">{{ course.lesson_total }} lesson{{ course.lesson_total|pluralize }}</span>
+                <span class="pill">{{ course.learner_total }} enrolled</span>
+                {% for instructor in course.instructors.all %}
+                <span class="pill">{{ instructor }}</span>
+                {% endfor %}
+            </div>
+            <span class="course-link">Open course</span>
+        </a>
+        {% empty %}
+        <div class="empty-card">
+            <h3>No courses match that search</h3>
+            <p>Try a different keyword, or <a href="{% url 'course_list' %}">browse everything</a>.</p>
+        </div>
+        {% endfor %}
+    </section>
+</main>
+{% endblock %}

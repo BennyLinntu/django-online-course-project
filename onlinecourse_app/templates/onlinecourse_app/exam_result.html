@@ -1,54 +1,78 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
+{% block title %}Result · {{ course.name }}{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>Exam Result</title>
-    {% load static %}
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-</head>
+{% block content %}
+<main class="shell">
+    <a class="breadcrumb" href="{% url 'course_details' course.id %}">← Back to {{ course.name }}</a>
 
-<body>
-    <div class="container mt-5">
-        <h1>Exam Result for {{ course.name }}</h1>
-
-        {% if result.score >= 70 %}
-        <div class="alert alert-success">
-            <strong>Congratulations!</strong> You have passed the exam.
-        </div>
-        {% else %}
-        <div class="alert alert-danger">
-            <strong>Sorry!</strong> You have not passed the exam.
-        </div>
-        {% endif %}
-
-        <h2>Your Score: {{ result.score|floatformat:2 }}%</h2>
-        <p>Correct Answers: {{ result.correct_answers }} out of {{ result.total_questions }}</p>
-
-        <h3>Your Answers:</h3>
-        {% for submission in submissions %}
-        {% for choice in submission.choices.all %}
-        <div class="card mb-3">
-            <div class="card-body">
-                <h5 class="card-title">{{ choice.question.question_text }}</h5>
-                <p class="card-text">Your answer: {{ choice.choice_text }}</p>
-                {% if choice.is_correct %}
-                <p class="text-success">Correct</p>
-                {% else %}
-                <p class="text-danger">Incorrect</p>
-                {% for correct_choice in choice.question.choice_set.all %}
-                {% if correct_choice.is_correct %}
-                <p class="text-info">Correct answer: {{ correct_choice.choice_text }}</p>
-                {% endif %}
-                {% endfor %}
-                {% endif %}
+    <section class="result-hero">
+        <div class="result-big-ring" data-score="{{ attempt.score|floatformat:0 }}"
+            style="--score: {{ attempt.score|floatformat:0 }};"></div>
+        <div class="result-copy">
+            <span class="result-badge {% if not passed %}fail{% endif %}">
+                {% if passed %}Passed{% else %}Keep going{% endif %}
+            </span>
+            <h1>{% if passed %}Nice work — you passed.{% else %}Almost there.{% endif %}</h1>
+            <p>
+                You scored <strong>{{ attempt.score|floatformat:1 }}%</strong>
+                on {{ attempt.total_questions }} question{{ attempt.total_questions|pluralize }}.
+                {% if passed %}Your answers are below if you want to review them.
+                {% else %}Review the explanations, revisit the lessons, then try again.{% endif %}
+            </p>
+            <div class="result-stats">
+                <div class="result-stat"><strong>{{ attempt.correct_count }}/{{ attempt.total_questions }}</strong><span>Correct</span></div>
+                <div class="result-stat"><strong>{{ earned_points }}/{{ total_points }}</strong><span>Points</span></div>
+                <div class="result-stat"><strong>{{ attempt.score|floatformat:0 }}%</strong><span>Score</span></div>
             </div>
         </div>
-        {% endfor %}
-        {% endfor %}
+    </section>
 
-        <a href="{% url 'course_details' course.id %}" class="btn btn-primary">Back to Course</a>
+    <div class="detail-layout">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Answer review</h2>
+                <span>{{ attempt.submitted_at|date:"M j, Y · H:i" }}</span>
+            </div>
+            <div class="answer-list">
+                {% for item in result_details %}
+                <article class="answer-card {% if not item.selected %}unanswered{% elif not item.is_correct %}incorrect{% endif %}">
+                    <span class="answer-icon">
+                        {% if not item.selected %}—{% elif item.is_correct %}✓{% else %}×{% endif %}
+                    </span>
+                    <div>
+                        <h3>{{ forloop.counter }}. {{ item.question.question_text }}</h3>
+                        {% if item.selected %}
+                        <p class="answer-line">Your answer: <strong>{{ item.selected.choice_text }}</strong></p>
+                        {% else %}
+                        <p class="answer-line">Your answer: <strong>Not answered</strong></p>
+                        {% endif %}
+                        {% if not item.is_correct and item.correct_choice %}
+                        <p class="answer-line">Correct answer: <strong>{{ item.correct_choice.choice_text }}</strong></p>
+                        {% endif %}
+                    </div>
+                    <span class="answer-points">{{ item.points }}/{{ item.question.grade }} pt</span>
+                </article>
+                {% endfor %}
+            </div>
+
+            <div class="result-actions">
+                <a class="btn btn-accent" href="{% url 'course_details' course.id %}#exam">Retake exam</a>
+                <a class="btn btn-ghost" href="{% url 'course_details' course.id %}">Back to course</a>
+            </div>
+        </section>
+
+        <aside>
+            <div class="side-card">
+                <h2>What next?</h2>
+                <p>Use the feedback above to close the gaps.</p>
+                <ul class="side-list">
+                    <li><span>Attempt</span><strong>{{ attempt.submitted_at|date:"M j" }}</strong></li>
+                    <li><span>Pass mark</span><strong>70%</strong></li>
+                    <li><span>Status</span><strong>{% if passed %}Passed{% else %}Retry{% endif %}</strong></li>
+                </ul>
+                <a class="btn" href="{% url 'course_details' course.id %}">Return to lessons</a>
+            </div>
+        </aside>
     </div>
-</body>
-
-</html>
+</main>
+{% endblock %}
